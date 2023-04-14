@@ -1,6 +1,7 @@
+import requests;
+import time;
 import math;
 import sys;
-from stupidArtnet import StupidArtnetServer
 
 if (__name__ == "__main__"):
     arguments = sys.argv;
@@ -8,23 +9,31 @@ if (__name__ == "__main__"):
     if (len(arguments) <= 1):
         print("ArtNet Reciever.");
         print("Arguments: ");
-        print("[ Universe ] [ Start Channel Index (Default: 0) ] [End Channel Index (Default: 512) ]");
+        print(" [ Host ][ WebPort (Default: 9090) ][ Universe (Default: 1) ] [ Start Channel Index (Default: 0) ] [End Channel Index (Default: 512) ]");
         print("Universe - Creates a ArtNet Stupid Server that recieves ArtNet data from that specific universe number");
         print("Start Channel Index - The left slice position of the raw data recieved");
         print("End Channel Index - The right slice position of the raw data recieved");
 
         print("\nExamples:");
-        print("./monitor 0 0 512");
+        print("python3 main.py localhost 9090 1 0 512");
         print("Listens on universe 0, includes all channel");
         exit(0);
-        
-    universe = int(arguments[1]);
-    from_slice = 0;
+    
+    host = "localhost";
+    if (len(arguments) >= 2):
+        host = arguments[1];
+    port = 9090;
     if (len(arguments) >= 3):
-        from_slice = int(arguments[2]);
-    to_slice = 512;
+        port = int(arguments[2]);
+    universe = 1;
     if (len(arguments) >= 4):
-        to_slice = int(arguments[3]);
+        universe = int(arguments[3]);
+    from_slice = 0;
+    if (len(arguments) >= 5):
+        from_slice = int(arguments[4]);
+    to_slice = 512;
+    if (len(arguments) >= 6):
+        to_slice = int(arguments[5]);
     
     # previous_data = [0] * 512;
 
@@ -49,7 +58,7 @@ if (__name__ == "__main__"):
         changes = 0;
 
         for index in range(from_slice, min(len(data), to_slice + 1)):
-            if (data[index] != 0):
+            if (data[index] != 0 and changes < 10):
                 changes += 1;
                 image += f"\t[Channel {index}]: {data[index]}\n";
         
@@ -104,14 +113,24 @@ if (__name__ == "__main__"):
         
         print(f"\nListening on Universe {universe}...");
         print("-------------------------------");
-        print("Press Enter to End Listening Session");
-        
-
-    server = StupidArtnetServer();
-    print("Created Server!");
-        
-    listener = server.register_listener(universe, callback_function=new_data);
+        print("Press CTR + C to End Listening Session");
         
     print(f"Listening on Universe {universe}...");
     print("-------------------------------");
-    input("Press Enter to End Listening Session");
+    print("Press CTR + C to End Listening Session");
+
+    while (True):
+
+        response = requests.get(f"http://{host}:{port}/get_dmx?u={universe}");
+        data = response.json();
+        channels = data["dmx"];
+        
+        if (data["error"] != ""):
+            print(data["error"]);
+            exit(1);
+        else:
+            new_data(channels);
+
+        time.sleep(.25);
+
+
